@@ -118,7 +118,7 @@ def get_categories():
 
     cj = cookielib.LWPCookieJar(COOKIE_FILE)
     try:
-        cj.load(COOKIE_FILE, ignore_discard=True)
+        cj.load(COOKIE_FILE, ignore_discard=False)
     except:
         pass
 
@@ -193,15 +193,15 @@ def build_menu(items):
     is_folder = 'id' not in first.keys()
 
     for i in items:
-        thumb = i['thumb'] if not is_folder else None
+        #thumb = i['thumb'] if not is_folder else None
         # stupid encoding hack for now..
         try:
             i_title = i['title'].encode('utf-8')
         except:
             i_title = i['title']
 
-        title = '[B][{0}][/B]  {1}'.format(i['airdate'], i_title) if not is_folder else i_title
-        item = xbmcgui.ListItem(label=title, thumbnailImage=thumb)   
+        title =  i_title
+        item = xbmcgui.ListItem(label=title)   
         if is_folder:
             url = '{0}?action=traverse&u={1}&t={2}'.format(addon_url, i['url'], i_title)
         else:
@@ -239,50 +239,50 @@ def get_parsed_subs(data):
     url = 'http://www.ufc.tv/category/'
     # patch multiple class li tag returned from server -- IE: <li class="select" class="last">..</li>
     # parser does not pick up both -- just the last class attr it sees
-    pattern = 'class=\"select\" class=\"last\"'
-    if re.compile(pattern).search(data):
-        data = re.sub(pattern, 'class=\"select\"', data)
+    #pattern = 'class=\"select\" class=\"last\"'
+    #if re.compile(pattern).search(data):
+        #data = re.sub(pattern, 'class=\"select\"', data)
 
-    soup  = BeautifulSoup(data)
-    lists = soup.find_all('ul', 'subMenuList')
-    lists[:] = [l for l in lists if not l.find('li', class_='select')]
+    soup  = BeautifulSoup(data, 'html.parser')
+    lists = soup.findAll(True, {'class': re.compile(r'\bcol\b')})
+    #lists[:] = [l for l in lists if not l.find('li', class_='select')]
 
     s_list = []
+    
+    for sub in lists:
+        for subs in sub.findAll('a'):
 
-    if len(lists) > 0:
-        subs = lists[0].find_all('a') 
-        if len(subs) > 0:     
-            for sub in subs:
-                t = sub.get_text().encode('utf-8')
-                u = url + sub['href']
-                s_list.append({
-                    'title': t, 
+            t = str(subs['href'])
+            u = subs['href']
+            if 'ufc.tv/category/' in t:
+                l2 = {
+                    'title': t.rsplit('/', 1)[-1], 
                     'url': u
-                })
-
+                }
+        
+                s_list.append(l2)
     return s_list
-
-
+    
 def get_parsed_vids(data):
     soup = BeautifulSoup(data)
-    vids = soup.find_all('table', 'narrowDetail oneCol')
+    vids = soup.findAll('div', {"class": 'col-lg-2 col-mp10-2 col-md-3 col-sm-4 col-xs-6'})
     v_list = []
     if len(vids) > 0:     
         for vid in vids:
-            i_src   = vid.find('img', 'thumbImg')['src']
+            v_title = vid.find('div', {'class' : 'hidden-title'})['title']
+            v_link    = str(vid.find('a')['href'])
+            i_src   = vid.find('img')['src']
             v_id    = re.compile('(\d+)_').search(i_src).group(0)[:-1]
-            v_title = vid.find('a', 'txt name').get_text().encode('utf-8')
-            v_date  = vid.find('span', 'item first').get_text()
-            v_plot  = vid.find('div', 'txt desc').get_text().encode('utf-8')
-            v_thumb = i_src
-
-            v_list.append({
-                'id': v_id, 
-                'title': v_title, 
-                'thumb': v_thumb, 
-                'airdate': v_date, 
-                'plot': v_plot
-            })
+            
+            
+            if '/video/' in v_link:
+                v_list.append({
+                    'id': v_id, 
+                    'title': v_title, 
+                    #'thumb': v_thumb, 
+                    #'airdate': v_date, 
+                    #'plot': v_plot
+                })
 
     return v_list
 
